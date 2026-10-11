@@ -32,4 +32,9 @@ public class LocationGateway implements LocationResolver {
         .findFirst()
         .orElse(null);
   }
+
+  /** Number of known locations, used by the readiness health check. */
+  public int countLocations() {
+    return locations.size();
+  }
 }
