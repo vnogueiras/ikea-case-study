@@ -9,15 +9,23 @@ import java.util.List;
 @ApplicationScoped
 public class WarehouseRepository implements WarehouseStore, PanacheRepository<DbWarehouse> {
 
+  /** Returns the active (not archived) warehouses. */
   @Override
   public List<Warehouse> getAll() {
-    return this.listAll().stream().map(DbWarehouse::toWarehouse).toList();
+    return this.list("archivedAt is null").stream().map(DbWarehouse::toWarehouse).toList();
   }
 
   @Override
   public void create(Warehouse warehouse) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'create'");
+    DbWarehouse entity = new DbWarehouse();
+    entity.businessUnitCode = warehouse.businessUnitCode;
+    entity.location = warehouse.location;
+    entity.capacity = warehouse.capacity;
+    entity.stock = warehouse.stock;
+    entity.createdAt = warehouse.createdAt;
+    entity.archivedAt = warehouse.archivedAt;
+    this.persist(entity);
+    warehouse.id = entity.id;
   }
 
   @Override
@@ -32,9 +40,12 @@ public class WarehouseRepository implements WarehouseStore, PanacheRepository<Db
     throw new UnsupportedOperationException("Unimplemented method 'remove'");
   }
 
+  /** Returns the active warehouse with this business unit code, or null. */
   @Override
   public Warehouse findByBusinessUnitCode(String buCode) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'findById'");
+    return this.find("businessUnitCode = ?1 and archivedAt is null", buCode)
+        .firstResultOptional()
+        .map(DbWarehouse::toWarehouse)
+        .orElse(null);
   }
 }
