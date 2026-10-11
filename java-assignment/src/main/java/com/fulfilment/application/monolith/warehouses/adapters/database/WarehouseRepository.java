@@ -30,8 +30,17 @@ public class WarehouseRepository implements WarehouseStore, PanacheRepository<Db
 
   @Override
   public void update(Warehouse warehouse) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'replace'");
+    DbWarehouse entity = this.findById(warehouse.id);
+    if (entity == null) {
+      throw new IllegalArgumentException("Warehouse with id " + warehouse.id + " does not exist.");
+    }
+    // the entity is managed, so the changes are saved when the transaction commits
+    entity.businessUnitCode = warehouse.businessUnitCode;
+    entity.location = warehouse.location;
+    entity.capacity = warehouse.capacity;
+    entity.stock = warehouse.stock;
+    entity.createdAt = warehouse.createdAt;
+    entity.archivedAt = warehouse.archivedAt;
   }
 
   @Override

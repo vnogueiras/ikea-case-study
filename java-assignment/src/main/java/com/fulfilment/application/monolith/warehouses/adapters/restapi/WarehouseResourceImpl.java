@@ -2,6 +2,7 @@ package com.fulfilment.application.monolith.warehouses.adapters.restapi;
 
 import com.fulfilment.application.monolith.warehouses.adapters.database.WarehouseRepository;
 import com.fulfilment.application.monolith.warehouses.domain.ports.CreateWarehouseOperation;
+import com.fulfilment.application.monolith.warehouses.domain.ports.ReplaceWarehouseOperation;
 import com.warehouse.api.WarehouseResource;
 import com.warehouse.api.beans.Warehouse;
 import jakarta.enterprise.context.RequestScoped;
@@ -16,6 +17,7 @@ public class WarehouseResourceImpl implements WarehouseResource {
 
   @Inject private WarehouseRepository warehouseRepository;
   @Inject private CreateWarehouseOperation createWarehouseOperation;
+  @Inject private ReplaceWarehouseOperation replaceWarehouseOperation;
 
   @Override
   public List<Warehouse> listAllWarehousesUnits() {
@@ -25,11 +27,7 @@ public class WarehouseResourceImpl implements WarehouseResource {
   @Override
   @Transactional
   public Warehouse createANewWarehouseUnit(@NotNull Warehouse data) {
-    var warehouse = new com.fulfilment.application.monolith.warehouses.domain.models.Warehouse();
-    warehouse.businessUnitCode = data.getBusinessUnitCode();
-    warehouse.location = data.getLocation();
-    warehouse.capacity = data.getCapacity();
-    warehouse.stock = data.getStock();
+    var warehouse = toDomain(data);
 
     createWarehouseOperation.create(warehouse);
 
@@ -53,11 +51,16 @@ public class WarehouseResourceImpl implements WarehouseResource {
   }
 
   @Override
+  @Transactional
   public Warehouse replaceTheCurrentActiveWarehouse(
       String businessUnitCode, @NotNull Warehouse data) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException(
-        "Unimplemented method 'replaceTheCurrentActiveWarehouse'");
+    var warehouse = toDomain(data);
+    // the new warehouse re-uses the business unit code of the one being replaced
+    warehouse.businessUnitCode = businessUnitCode;
+
+    replaceWarehouseOperation.replace(warehouse);
+
+    return toWarehouseResponse(warehouse);
   }
 
   /** The id is a path string; anything that isn't a number can't match a warehouse. */
@@ -67,6 +70,16 @@ public class WarehouseResourceImpl implements WarehouseResource {
     } catch (NumberFormatException e) {
       return null;
     }
+  }
+
+  private com.fulfilment.application.monolith.warehouses.domain.models.Warehouse toDomain(
+      Warehouse data) {
+    var warehouse = new com.fulfilment.application.monolith.warehouses.domain.models.Warehouse();
+    warehouse.businessUnitCode = data.getBusinessUnitCode();
+    warehouse.location = data.getLocation();
+    warehouse.capacity = data.getCapacity();
+    warehouse.stock = data.getStock();
+    return warehouse;
   }
 
   private Warehouse toWarehouseResponse(

@@ -109,6 +109,70 @@ public class WarehouseResourceTest {
     given().when().get(PATH + "/abc").then().statusCode(404);
   }
 
+  @Test
+  public void replaceShouldArchiveOldAndCreateNewWithSameBusinessUnitCode() {
+    String buCode = uniqueBuCode();
+    String oldId = createWarehouse(buCode, "EINDHOVEN-001", 20, 10);
+
+    String newId =
+        given()
+            .contentType(ContentType.JSON)
+            .body(warehouseJson(buCode, "EINDHOVEN-001", 30, 10))
+            .when()
+            .post(PATH + "/" + buCode + "/replacement")
+            .then()
+            .statusCode(200)
+            .body("businessUnitCode", equalTo(buCode))
+            .body("capacity", equalTo(30))
+            .extract()
+            .path("id");
+
+    // the old warehouse is archived, the new one is the active one for this business unit
+    given().when().get(PATH + "/" + oldId).then().statusCode(404);
+    given().when().get(PATH + "/" + newId).then().statusCode(200).body("capacity", equalTo(30));
+  }
+
+  @Test
+  public void replaceShouldRejectStockMismatch() {
+    String buCode = uniqueBuCode();
+    String id = createWarehouse(buCode, "AMSTERDAM-002", 10, 4);
+
+    given()
+        .contentType(ContentType.JSON)
+        .body(warehouseJson(buCode, "AMSTERDAM-002", 10, 5))
+        .when()
+        .post(PATH + "/" + buCode + "/replacement")
+        .then()
+        .statusCode(400)
+        .body("error", containsString("match"));
+
+    // nothing changed, the original warehouse is still active
+    given().when().get(PATH + "/" + id).then().statusCode(200);
+  }
+
+  @Test
+  public void replaceShouldReturn404ForUnknownBusinessUnitCode() {
+    given()
+        .contentType(ContentType.JSON)
+        .body(warehouseJson("MWH.UNKNOWN", "AMSTERDAM-002", 10, 1))
+        .when()
+        .post(PATH + "/MWH.UNKNOWN/replacement")
+        .then()
+        .statusCode(404);
+  }
+
+  private String createWarehouse(String buCode, String location, int capacity, int stock) {
+    return given()
+        .contentType(ContentType.JSON)
+        .body(warehouseJson(buCode, location, capacity, stock))
+        .when()
+        .post(PATH)
+        .then()
+        .statusCode(200)
+        .extract()
+        .path("id");
+  }
+
   private void assertRejected(String body, String messagePart) {
     given()
         .contentType(ContentType.JSON)
