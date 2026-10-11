@@ -15,6 +15,8 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <maven.compiler.release>17</maven.compiler.release>
+        <!-- `-DskipUTs` skips only the unit tests (Surefire), e.g. to run just the integration tests -->
+        <skipUTs>false</skipUTs>
     </properties>
 
     <dependencyManagement>
@@ -92,6 +94,7 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${surefire-plugin.version}</version>
                 <configuration>
+                    <skip>${skipUTs}</skip>
                     <systemPropertyVariables>
                         <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
                         <maven.home>${maven.home}</maven.home>
@@ -136,6 +139,12 @@
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>0.8.13</version>
+                <configuration>
+                    <!-- Code generated from the OpenAPI spec is not ours to test -->
+                    <excludes>
+                        <exclude>com/warehouse/api/**</exclude>
+                    </excludes>
+                </configuration>
                 <executions>
                     <execution>
                         <!-- Agent for plain JUnit tests; Quarkus-loaded classes are left to quarkus-jacoco -->
@@ -158,6 +167,30 @@
                         </goals>
                         <configuration>
                             <dataFile>${project.build.directory}/jacoco-quarkus.exec</dataFile>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <!-- Fails the build if any package has less than 80% line coverage.
+                             Runs in `mvn verify`, or on its own: mvn jacoco:check@coverage-check -->
+                        <id>coverage-check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <dataFile>${project.build.directory}/jacoco-quarkus.exec</dataFile>
+                            <rules>
+                                <rule>
+                                    <element>PACKAGE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.80</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
                         </configuration>
                     </execution>
                 </executions>

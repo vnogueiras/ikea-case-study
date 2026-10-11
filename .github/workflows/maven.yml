@@ -1,10 +1,7 @@
-# This workflow will build a Java project with Maven, and cache/restore any dependencies to improve the workflow execution time
+# Build, tests and coverage run as separate jobs:
+#   build ──┬── unit-tests ── coverage
+#           └── integration-tests
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-java-with-maven
-
-# This workflow uses actions that are not certified by GitHub.
-# They are provided by a third-party and are governed by
-# separate terms of service, privacy policy, and support
-# documentation.
 
 name: Java CI with Maven
 
@@ -14,21 +11,144 @@ on:
   pull_request:
     branches: [ "main" ]
 
+defaults:
+  run:
+    working-directory: java-assignment
+
 jobs:
   build:
-
+    name: Build
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: maven
+        cache-dependency-path: java-assignment/pom.xml
+    - name: Build the app
+      run: mvn --batch-mode --update-snapshots -DskipTests package
+    - name: Upload the packaged app
+      uses: actions/upload-artifact@v4
+      with:
+        name: quarkus-app
+        path: java-assignment/target/quarkus-app/
+
+  unit-tests:
+    name: Unit tests
+    needs: build
+    runs-on: ubuntu-latest
     # checks: write lets the test report action publish results on commits and PRs
     permissions:
       contents: read
       checks: write
 
-    defaults:
-      run:
-        working-directory: java-assignment
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: maven
+        cache-dependency-path: java-assignment/pom.xml
+    # Runs the *Test classes (plain JUnit and @QuarkusTest) and builds the JaCoCo report
+    - name: Run unit tests
+      run: mvn --batch-mode test
 
-    # Database for the integration tests: the packaged app uses the %prod datasource (localhost:15432)
+    - name: Publish unit test results
+      if: always()
+      uses: mikepenz/action-junit-report@v5
+      with:
+        report_paths: java-assignment/target/surefire-reports/TEST-*.xml
+        check_name: Unit test results
+        include_passed: true
+        detailed_summary: true
+    - name: Upload unit test reports
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: unit-test-reports
+        path: java-assignment/target/surefire-reports/
+        if-no-files-found: ignore
+    # The coverage job checks this data against the compiled classes it was recorded for
+    - name: Upload coverage data
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-data
+        path: |
+          java-assignment/target/jacoco-quarkus.exec
+          java-assignment/target/classes/
+        if-no-files-found: error
+
+  coverage:
+    name: Coverage (min 80% per package)
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: maven
+        cache-dependency-path: java-assignment/pom.xml
+    - name: Download coverage data
+      uses: actions/download-artifact@v4
+      with:
+        name: coverage-data
+        path: java-assignment/target
+
+    - name: Build coverage report
+      run: mvn --batch-mode jacoco:report@report
+
+    - name: Add coverage per package to the job summary
+      if: always()
+      run: |
+        python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+        import csv
+        totals = {}
+        for row in csv.DictReader(open("target/site/jacoco/jacoco.csv")):
+            missed, covered = totals.get(row["PACKAGE"], (0, 0))
+            totals[row["PACKAGE"]] = (missed + int(row["LINE_MISSED"]), covered + int(row["LINE_COVERED"]))
+        print("### Line coverage per package (minimum 80%)\n")
+        print("| Package | Lines | Coverage | |")
+        print("|---|---|---|---|")
+        for package, (missed, covered) in sorted(totals.items()):
+            total = missed + covered
+            ratio = covered / total if total else 1
+            print(f"| {package} | {covered}/{total} | {ratio:.0%} | {'✅' if ratio >= 0.8 else '❌'} |")
+        PY
+
+    - name: Check minimum coverage
+      run: mvn --batch-mode jacoco:check@coverage-check
+
+    - name: Upload JaCoCo coverage report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: jacoco-report
+        path: java-assignment/target/site/jacoco/
+        if-no-files-found: warn
+
+  integration-tests:
+    name: Integration tests
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+
+    # Database for the packaged app, which uses the %prod datasource (localhost:15432)
     services:
       postgres:
         image: postgres:13.3
@@ -53,38 +173,22 @@ jobs:
         distribution: 'temurin'
         cache: maven
         cache-dependency-path: java-assignment/pom.xml
-    - name: Build the app
-      run: mvn --batch-mode --update-snapshots -DskipTests package
-    - name: Run unit and integration tests
-      run: mvn --batch-mode verify
+    # Packages the app and runs the *IT classes (@QuarkusIntegrationTest) against it
+    - name: Run integration tests
+      run: mvn --batch-mode verify -DskipUTs
 
-    # Show test results (passed/failed tests with messages) as a check on the commit / PR
-    - name: Publish test results
+    - name: Publish integration test results
       if: always()
       uses: mikepenz/action-junit-report@v5
       with:
-        report_paths: |
-          java-assignment/target/surefire-reports/TEST-*.xml
-          java-assignment/target/failsafe-reports/TEST-*.xml
-        check_name: Test results
+        report_paths: java-assignment/target/failsafe-reports/TEST-*.xml
+        check_name: Integration test results
         include_passed: true
         detailed_summary: true
-
-    # Keep the raw test reports and the JaCoCo coverage report downloadable from the run
-    - name: Upload test reports
+    - name: Upload integration test reports
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: test-reports
-        path: |
-          java-assignment/target/surefire-reports/
-          java-assignment/target/failsafe-reports/
+        name: integration-test-reports
+        path: java-assignment/target/failsafe-reports/
         if-no-files-found: ignore
-
-    - name: Upload JaCoCo coverage report
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: jacoco-report
-        path: java-assignment/target/site/jacoco/
-        if-no-files-found: warn
