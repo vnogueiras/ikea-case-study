@@ -28,6 +28,22 @@ jobs:
       run:
         working-directory: java-assignment
 
+    # Database for the integration tests: the packaged app uses the %prod datasource (localhost:15432)
+    services:
+      postgres:
+        image: postgres:13.3
+        env:
+          POSTGRES_USER: quarkus_test
+          POSTGRES_PASSWORD: quarkus_test
+          POSTGRES_DB: quarkus_test
+        ports:
+          - 15432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     steps:
     - uses: actions/checkout@v4
     - name: Set up JDK 17
@@ -39,7 +55,7 @@ jobs:
         cache-dependency-path: java-assignment/pom.xml
     - name: Build the app
       run: mvn --batch-mode --update-snapshots -DskipTests package
-    - name: Run the Maven verify phase
+    - name: Run unit and integration tests
       run: mvn --batch-mode verify
 
     # Show test results (passed/failed tests with messages) as a check on the commit / PR
