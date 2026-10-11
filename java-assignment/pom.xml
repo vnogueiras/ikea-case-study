@@ -178,6 +178,8 @@
                             <goal>check</goal>
                         </goals>
                         <configuration>
+                            <!-- Coverage comes from the unit tests, so there is nothing to check without them -->
+                            <skip>${skipUTs}</skip>
                             <dataFile>${project.build.directory}/jacoco-quarkus.exec</dataFile>
                             <rules>
                                 <rule>

@@ -173,9 +173,10 @@ jobs:
         distribution: 'temurin'
         cache: maven
         cache-dependency-path: java-assignment/pom.xml
-    # Packages the app and runs the *IT classes (@QuarkusIntegrationTest) against it
+    # Packages the app and runs the *IT classes (@QuarkusIntegrationTest) against it.
+    # No JaCoCo here: the app runs in its own process, so coverage is measured by the unit tests job.
     - name: Run integration tests
-      run: mvn --batch-mode verify -DskipUTs
+      run: mvn --batch-mode verify -DskipUTs -Djacoco.skip=true
 
     - name: Publish integration test results
       if: always()
