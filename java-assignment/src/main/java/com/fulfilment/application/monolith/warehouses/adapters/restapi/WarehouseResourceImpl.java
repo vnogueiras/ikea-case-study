@@ -1,6 +1,8 @@
 package com.fulfilment.application.monolith.warehouses.adapters.restapi;
 
 import com.fulfilment.application.monolith.warehouses.adapters.database.WarehouseRepository;
+import com.fulfilment.application.monolith.warehouses.domain.exceptions.WarehouseNotFoundException;
+import com.fulfilment.application.monolith.warehouses.domain.ports.ArchiveWarehouseOperation;
 import com.fulfilment.application.monolith.warehouses.domain.ports.CreateWarehouseOperation;
 import com.fulfilment.application.monolith.warehouses.domain.ports.ReplaceWarehouseOperation;
 import com.warehouse.api.WarehouseResource;
@@ -9,7 +11,6 @@ import jakarta.enterprise.context.RequestScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.validation.constraints.NotNull;
-import jakarta.ws.rs.NotFoundException;
 import java.util.List;
 
 @RequestScoped
@@ -18,6 +19,7 @@ public class WarehouseResourceImpl implements WarehouseResource {
   @Inject private WarehouseRepository warehouseRepository;
   @Inject private CreateWarehouseOperation createWarehouseOperation;
   @Inject private ReplaceWarehouseOperation replaceWarehouseOperation;
+  @Inject private ArchiveWarehouseOperation archiveWarehouseOperation;
 
   @Override
   public List<Warehouse> listAllWarehousesUnits() {
@@ -36,18 +38,13 @@ public class WarehouseResourceImpl implements WarehouseResource {
 
   @Override
   public Warehouse getAWarehouseUnitByID(String id) {
-    Long parsedId = parseId(id);
-    var warehouse = parsedId == null ? null : warehouseRepository.findActiveById(parsedId);
-    if (warehouse == null) {
-      throw new NotFoundException("Warehouse with id " + id + " not found.");
-    }
-    return toWarehouseResponse(warehouse);
+    return toWarehouseResponse(findActiveWarehouse(id));
   }
 
   @Override
+  @Transactional
   public void archiveAWarehouseUnitByID(String id) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'archiveAWarehouseUnitByID'");
+    archiveWarehouseOperation.archive(findActiveWarehouse(id));
   }
 
   @Override
@@ -61,6 +58,16 @@ public class WarehouseResourceImpl implements WarehouseResource {
     replaceWarehouseOperation.replace(warehouse);
 
     return toWarehouseResponse(warehouse);
+  }
+
+  private com.fulfilment.application.monolith.warehouses.domain.models.Warehouse
+      findActiveWarehouse(String id) {
+    Long parsedId = parseId(id);
+    var warehouse = parsedId == null ? null : warehouseRepository.findActiveById(parsedId);
+    if (warehouse == null) {
+      throw new WarehouseNotFoundException("Warehouse with id " + id + " not found.");
+    }
+    return warehouse;
   }
 
   /** The id is a path string; anything that isn't a number can't match a warehouse. */

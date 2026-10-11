@@ -3,6 +3,7 @@ package com.fulfilment.application.monolith.warehouses.adapters.restapi;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
 
 import io.quarkus.test.junit.QuarkusTest;
@@ -159,6 +160,35 @@ public class WarehouseResourceTest {
         .post(PATH + "/MWH.UNKNOWN/replacement")
         .then()
         .statusCode(404);
+  }
+
+  @Test
+  public void archiveShouldHideWarehouse() {
+    String buCode = uniqueBuCode();
+    String id = createWarehouse(buCode, "AMSTERDAM-002", 10, 1);
+
+    given().when().delete(PATH + "/" + id).then().statusCode(204);
+
+    given().when().get(PATH + "/" + id).then().statusCode(404);
+    given().when().get(PATH).then().statusCode(200).body(not(containsString(buCode)));
+  }
+
+  @Test
+  public void archiveShouldReturn404ForUnknownOrAlreadyArchivedWarehouse() {
+    String id = createWarehouse(uniqueBuCode(), "AMSTERDAM-002", 10, 1);
+    given().when().delete(PATH + "/" + id).then().statusCode(204);
+
+    given().when().delete(PATH + "/" + id).then().statusCode(404);
+    given().when().delete(PATH + "/999999").then().statusCode(404);
+  }
+
+  @Test
+  public void archivedBusinessUnitCodeCanBeUsedAgain() {
+    String buCode = uniqueBuCode();
+    String id = createWarehouse(buCode, "ZWOLLE-002", 10, 1);
+    given().when().delete(PATH + "/" + id).then().statusCode(204);
+
+    createWarehouse(buCode, "ZWOLLE-002", 10, 1);
   }
 
   private String createWarehouse(String buCode, String location, int capacity, int stock) {
