@@ -3,6 +3,7 @@ package com.fulfilment.application.monolith.stores;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
+import static org.hamcrest.Matchers.hasItems;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -218,6 +219,61 @@ public class StoreResourceTest {
         .statusCode(404);
 
     verify(legacyStoreManagerGateway, never()).updateStoreOnLegacySystem(any());
+  }
+
+  @Test
+  public void patchShouldReturn422WhenNameIsMissing() {
+    given()
+        .contentType(ContentType.JSON)
+        .body("{\"quantityProductsInStock\": 1}")
+        .when()
+        .patch(PATH + "/1")
+        .then()
+        .statusCode(422);
+
+    verify(legacyStoreManagerGateway, never()).updateStoreOnLegacySystem(any());
+  }
+
+  // ---------- get / delete ----------
+
+  @Test
+  public void listShouldReturnStoresSortedByName() {
+    given()
+        .when()
+        .get(PATH)
+        .then()
+        .statusCode(200)
+        .body("name", hasItems("KALLAX", "BESTÅ"));
+  }
+
+  @Test
+  public void getSingleShouldReturnExistingStore() {
+    long id = createStore(uniqueName(), 4);
+
+    given()
+        .when()
+        .get(PATH + "/" + id)
+        .then()
+        .statusCode(200)
+        .body("quantityProductsInStock", equalTo(4));
+  }
+
+  @Test
+  public void getSingleShouldReturn404ForUnknownStore() {
+    given().when().get(PATH + "/999999").then().statusCode(404);
+  }
+
+  @Test
+  public void deleteShouldRemoveStore() {
+    long id = createStore(uniqueName(), 1);
+
+    given().when().delete(PATH + "/" + id).then().statusCode(204);
+    given().when().get(PATH + "/" + id).then().statusCode(404);
+  }
+
+  @Test
+  public void deleteShouldReturn404ForUnknownStore() {
+    given().when().delete(PATH + "/999999").then().statusCode(404);
   }
 
   // ---------- helpers ----------
