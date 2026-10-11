@@ -61,6 +61,54 @@ public class WarehouseResourceTest {
     assertRejected(warehouseJson(uniqueBuCode(), "VETSBY-001", 5, 6), "exceeds");
   }
 
+  @Test
+  public void getShouldReturnExistingWarehouse() {
+    // id 2 is MWH.012 in import.sql
+    given()
+        .when()
+        .get(PATH + "/2")
+        .then()
+        .statusCode(200)
+        .body("id", equalTo("2"))
+        .body("businessUnitCode", equalTo("MWH.012"))
+        .body("location", equalTo("AMSTERDAM-001"))
+        .body("capacity", equalTo(50))
+        .body("stock", equalTo(5));
+  }
+
+  @Test
+  public void getShouldReturnCreatedWarehouse() {
+    String buCode = uniqueBuCode();
+    String id =
+        given()
+            .contentType(ContentType.JSON)
+            .body(warehouseJson(buCode, "ZWOLLE-002", 10, 2))
+            .when()
+            .post(PATH)
+            .then()
+            .statusCode(200)
+            .extract()
+            .path("id");
+
+    given()
+        .when()
+        .get(PATH + "/" + id)
+        .then()
+        .statusCode(200)
+        .body("businessUnitCode", equalTo(buCode))
+        .body("location", equalTo("ZWOLLE-002"));
+  }
+
+  @Test
+  public void getShouldReturn404ForUnknownId() {
+    given().when().get(PATH + "/999999").then().statusCode(404);
+  }
+
+  @Test
+  public void getShouldReturn404ForNonNumericId() {
+    given().when().get(PATH + "/abc").then().statusCode(404);
+  }
+
   private void assertRejected(String body, String messagePart) {
     given()
         .contentType(ContentType.JSON)

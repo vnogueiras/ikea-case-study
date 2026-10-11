@@ -48,4 +48,12 @@ public class WarehouseRepository implements WarehouseStore, PanacheRepository<Db
         .map(DbWarehouse::toWarehouse)
         .orElse(null);
   }
+
+  /** Returns the active warehouse with this database id, or null. */
+  public Warehouse findActiveById(Long id) {
+    return this.find("id = ?1 and archivedAt is null", id)
+        .firstResultOptional()
+        .map(DbWarehouse::toWarehouse)
+        .orElse(null);
+  }
 }

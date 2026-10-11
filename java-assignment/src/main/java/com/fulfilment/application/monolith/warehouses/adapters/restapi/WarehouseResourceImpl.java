@@ -8,6 +8,7 @@ import jakarta.enterprise.context.RequestScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.validation.constraints.NotNull;
+import jakarta.ws.rs.NotFoundException;
 import java.util.List;
 
 @RequestScoped
@@ -37,8 +38,12 @@ public class WarehouseResourceImpl implements WarehouseResource {
 
   @Override
   public Warehouse getAWarehouseUnitByID(String id) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'getAWarehouseUnitByID'");
+    Long parsedId = parseId(id);
+    var warehouse = parsedId == null ? null : warehouseRepository.findActiveById(parsedId);
+    if (warehouse == null) {
+      throw new NotFoundException("Warehouse with id " + id + " not found.");
+    }
+    return toWarehouseResponse(warehouse);
   }
 
   @Override
@@ -53,6 +58,15 @@ public class WarehouseResourceImpl implements WarehouseResource {
     // TODO Auto-generated method stub
     throw new UnsupportedOperationException(
         "Unimplemented method 'replaceTheCurrentActiveWarehouse'");
+  }
+
+  /** The id is a path string; anything that isn't a number can't match a warehouse. */
+  private static Long parseId(String id) {
+    try {
+      return Long.valueOf(id);
+    } catch (NumberFormatException e) {
+      return null;
+    }
   }
 
   private Warehouse toWarehouseResponse(
