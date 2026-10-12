@@ -43,10 +43,17 @@ public class WarehouseRepository implements WarehouseStore, PanacheRepository<Db
     entity.archivedAt = warehouse.archivedAt;
   }
 
+  /**
+   * Physically deletes the warehouse row. The API never does this: warehouses are archived to keep
+   * their history (see ArchiveWarehouseUseCase).
+   */
   @Override
   public void remove(Warehouse warehouse) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'remove'");
+    DbWarehouse entity = this.findById(warehouse.id);
+    if (entity == null) {
+      throw new IllegalArgumentException("Warehouse with id " + warehouse.id + " does not exist.");
+    }
+    this.delete(entity);
   }
 
   /** Returns the active warehouse with this business unit code, or null. */
