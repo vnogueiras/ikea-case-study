@@ -8,7 +8,6 @@ import com.fulfilment.application.monolith.warehouses.domain.ports.WarehouseStor
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
-import jakarta.ws.rs.WebApplicationException;
 
 /** Assigns warehouses as fulfilment units of products for stores, enforcing the limits. */
 @ApplicationScoped
@@ -52,7 +51,7 @@ public class FulfilmentService {
   @Transactional
   public void remove(Long id) {
     if (!assignmentRepository.deleteById(id)) {
-      throw new WebApplicationException("Fulfilment assignment " + id + " does not exist.", 404);
+      throw new FulfilmentException.NotFound("Fulfilment assignment " + id + " does not exist.");
     }
   }
 
@@ -63,15 +62,15 @@ public class FulfilmentService {
         || productId == null
         || warehouseBuCode == null
         || warehouseBuCode.isBlank()) {
-      throw new WebApplicationException(
-          "storeId, productId and warehouseBusinessUnitCode are required.", 400);
+      throw new FulfilmentException.Invalid(
+          "storeId, productId and warehouseBusinessUnitCode are required.");
     }
   }
 
   private Store findStore(Long storeId) {
     Store store = storeRepository.findById(storeId);
     if (store == null) {
-      throw new WebApplicationException("Store with id " + storeId + " does not exist.", 404);
+      throw new FulfilmentException.NotFound("Store with id " + storeId + " does not exist.");
     }
     return store;
   }
@@ -79,7 +78,7 @@ public class FulfilmentService {
   private Product findProduct(Long productId) {
     Product product = productRepository.findById(productId);
     if (product == null) {
-      throw new WebApplicationException("Product with id " + productId + " does not exist.", 404);
+      throw new FulfilmentException.NotFound("Product with id " + productId + " does not exist.");
     }
     return product;
   }
@@ -87,8 +86,8 @@ public class FulfilmentService {
   /** Only active warehouses can be assigned; archived ones are not found by business unit code. */
   private void validateWarehouseIsActive(String warehouseBuCode) {
     if (warehouseStore.findByBusinessUnitCode(warehouseBuCode) == null) {
-      throw new WebApplicationException(
-          "Active warehouse with business unit code " + warehouseBuCode + " does not exist.", 404);
+      throw new FulfilmentException.NotFound(
+          "Active warehouse with business unit code " + warehouseBuCode + " does not exist.");
     }
   }
 
@@ -96,8 +95,8 @@ public class FulfilmentService {
 
   private void validateNotAlreadyAssigned(Long storeId, Long productId, String warehouseBuCode) {
     if (assignmentRepository.exists(storeId, productId, warehouseBuCode)) {
-      throw new WebApplicationException(
-          "Warehouse " + warehouseBuCode + " already fulfils this product for this store.", 409);
+      throw new FulfilmentException.Conflict(
+          "Warehouse " + warehouseBuCode + " already fulfils this product for this store.");
     }
   }
 
@@ -105,15 +104,14 @@ public class FulfilmentService {
   private void validateWarehousesPerProductPerStore(Long storeId, Long productId) {
     if (assignmentRepository.countWarehousesFor(storeId, productId)
         >= MAX_WAREHOUSES_PER_PRODUCT_PER_STORE) {
-      throw new WebApplicationException(
+      throw new FulfilmentException.Invalid(
           "Product "
               + productId
               + " already has the maximum of "
               + MAX_WAREHOUSES_PER_PRODUCT_PER_STORE
               + " warehouses for store "
               + storeId
-              + ".",
-          400);
+              + ".");
     }
   }
 
@@ -121,13 +119,12 @@ public class FulfilmentService {
   private void validateWarehousesPerStore(Long storeId, String warehouseBuCode) {
     if (!assignmentRepository.storeUsesWarehouse(storeId, warehouseBuCode)
         && assignmentRepository.countDistinctWarehousesFor(storeId) >= MAX_WAREHOUSES_PER_STORE) {
-      throw new WebApplicationException(
+      throw new FulfilmentException.Invalid(
           "Store "
               + storeId
               + " is already fulfilled by the maximum of "
               + MAX_WAREHOUSES_PER_STORE
-              + " warehouses.",
-          400);
+              + " warehouses.");
     }
   }
 
@@ -136,13 +133,12 @@ public class FulfilmentService {
     if (!assignmentRepository.warehouseStoresProduct(warehouseBuCode, productId)
         && assignmentRepository.countDistinctProductsFor(warehouseBuCode)
             >= MAX_PRODUCTS_PER_WAREHOUSE) {
-      throw new WebApplicationException(
+      throw new FulfilmentException.Invalid(
           "Warehouse "
               + warehouseBuCode
               + " already stores the maximum of "
               + MAX_PRODUCTS_PER_WAREHOUSE
-              + " product types.",
-          400);
+              + " product types.");
     }
   }
 }

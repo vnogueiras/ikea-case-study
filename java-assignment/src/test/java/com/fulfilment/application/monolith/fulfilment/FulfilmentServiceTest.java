@@ -16,7 +16,6 @@ import com.fulfilment.application.monolith.stores.Store;
 import com.fulfilment.application.monolith.stores.StoreRepository;
 import com.fulfilment.application.monolith.warehouses.domain.models.Warehouse;
 import com.fulfilment.application.monolith.warehouses.domain.ports.WarehouseStore;
-import jakarta.ws.rs.WebApplicationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
@@ -86,38 +85,38 @@ public class FulfilmentServiceTest {
   void shouldRejectThirdWarehouseForSameProductAndStore() {
     when(assignmentRepository.countWarehousesFor(STORE_ID, PRODUCT_ID)).thenReturn(2L);
 
-    assertRejected(400, () -> service.assign(STORE_ID, PRODUCT_ID, WAREHOUSE));
+    assertRejected(FulfilmentException.Invalid.class, () -> service.assign(STORE_ID, PRODUCT_ID, WAREHOUSE));
   }
 
   @Test
   void shouldRejectSameWarehouseTwice() {
     when(assignmentRepository.exists(STORE_ID, PRODUCT_ID, WAREHOUSE)).thenReturn(true);
 
-    assertRejected(409, () -> service.assign(STORE_ID, PRODUCT_ID, WAREHOUSE));
+    assertRejected(FulfilmentException.Conflict.class, () -> service.assign(STORE_ID, PRODUCT_ID, WAREHOUSE));
   }
 
   @Test
   void shouldReturn404ForUnknownStore() {
-    assertRejected(404, () -> service.assign(99L, PRODUCT_ID, WAREHOUSE));
+    assertRejected(FulfilmentException.NotFound.class, () -> service.assign(99L, PRODUCT_ID, WAREHOUSE));
   }
 
   @Test
   void shouldReturn404ForUnknownProduct() {
-    assertRejected(404, () -> service.assign(STORE_ID, 99L, WAREHOUSE));
+    assertRejected(FulfilmentException.NotFound.class, () -> service.assign(STORE_ID, 99L, WAREHOUSE));
   }
 
   @Test
   void shouldReturn404ForUnknownOrArchivedWarehouse() {
     // findByBusinessUnitCode only returns active warehouses, so archived ones are "unknown" too
-    assertRejected(404, () -> service.assign(STORE_ID, PRODUCT_ID, "MWH.ARCHIVED"));
+    assertRejected(FulfilmentException.NotFound.class, () -> service.assign(STORE_ID, PRODUCT_ID, "MWH.ARCHIVED"));
   }
 
   @Test
   void shouldReturn400ForMissingFields() {
-    assertRejected(400, () -> service.assign(null, PRODUCT_ID, WAREHOUSE));
-    assertRejected(400, () -> service.assign(STORE_ID, null, WAREHOUSE));
-    assertRejected(400, () -> service.assign(STORE_ID, PRODUCT_ID, null));
-    assertRejected(400, () -> service.assign(STORE_ID, PRODUCT_ID, " "));
+    assertRejected(FulfilmentException.Invalid.class, () -> service.assign(null, PRODUCT_ID, WAREHOUSE));
+    assertRejected(FulfilmentException.Invalid.class, () -> service.assign(STORE_ID, null, WAREHOUSE));
+    assertRejected(FulfilmentException.Invalid.class, () -> service.assign(STORE_ID, PRODUCT_ID, null));
+    assertRejected(FulfilmentException.Invalid.class, () -> service.assign(STORE_ID, PRODUCT_ID, " "));
   }
 
   @Test
@@ -125,7 +124,7 @@ public class FulfilmentServiceTest {
     when(assignmentRepository.countDistinctWarehousesFor(STORE_ID)).thenReturn(3L);
     when(assignmentRepository.storeUsesWarehouse(STORE_ID, WAREHOUSE)).thenReturn(false);
 
-    assertRejected(400, () -> service.assign(STORE_ID, PRODUCT_ID, WAREHOUSE));
+    assertRejected(FulfilmentException.Invalid.class, () -> service.assign(STORE_ID, PRODUCT_ID, WAREHOUSE));
   }
 
   @Test
@@ -153,7 +152,7 @@ public class FulfilmentServiceTest {
     when(assignmentRepository.countDistinctProductsFor(WAREHOUSE)).thenReturn(5L);
     when(assignmentRepository.warehouseStoresProduct(WAREHOUSE, PRODUCT_ID)).thenReturn(false);
 
-    assertRejected(400, () -> service.assign(STORE_ID, PRODUCT_ID, WAREHOUSE));
+    assertRejected(FulfilmentException.Invalid.class, () -> service.assign(STORE_ID, PRODUCT_ID, WAREHOUSE));
   }
 
   @Test
@@ -190,17 +189,14 @@ public class FulfilmentServiceTest {
   void shouldReturn404WhenRemovingUnknownAssignment() {
     when(assignmentRepository.deleteById(5L)).thenReturn(false);
 
-    WebApplicationException e =
-        assertThrows(WebApplicationException.class, () -> service.remove(5L));
-    assertEquals(404, e.getResponse().getStatus());
+    assertThrows(FulfilmentException.NotFound.class, () -> service.remove(5L));
   }
 
   // ---------- helpers ----------
 
-  /** The call fails with the given HTTP status and nothing is saved. */
-  private void assertRejected(int expectedStatus, Executable call) {
-    WebApplicationException e = assertThrows(WebApplicationException.class, call);
-    assertEquals(expectedStatus, e.getResponse().getStatus());
+  /** The call fails with the given error and nothing is saved. */
+  private void assertRejected(Class<? extends FulfilmentException> expected, Executable call) {
+    assertThrows(expected, call);
     verify(assignmentRepository, never()).persist(any(FulfilmentAssignment.class));
   }
 }
