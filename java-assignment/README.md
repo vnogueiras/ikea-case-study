@@ -6,6 +6,10 @@ This is a short code assignment that explores various aspects of software develo
 
 You will find the tasks of this assignment on [CODE_ASSIGNMENT](CODE_ASSIGNMENT.md) file
 
+## Testing
+
+See [TESTING](TESTING.md) for the test levels, how to run them, coverage and the positive and negative cases covered.
+
 ## About the code base
 
 This is based on https://github.com/quarkusio/quarkus-quickstarts
