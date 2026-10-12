@@ -1,4 +1,4 @@
-package com.fulfilment.application.monolith.stores;
+package com.fulfilment.application.monolith.common;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -10,17 +10,13 @@ import jakarta.ws.rs.core.Response;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-/**
- * Unit test for the mapper directly: ProductResource has an identical ExceptionMapper<Exception>,
- * and JAX-RS only uses one of them at runtime, so the 500 branches are tested here.
- */
-public class StoreErrorMapperTest {
+public class GlobalExceptionMapperTest {
 
-  private StoreResource.ErrorMapper mapper;
+  private GlobalExceptionMapper mapper;
 
   @BeforeEach
   void setUp() {
-    mapper = new StoreResource.ErrorMapper();
+    mapper = new GlobalExceptionMapper();
     mapper.objectMapper = new ObjectMapper();
   }
 

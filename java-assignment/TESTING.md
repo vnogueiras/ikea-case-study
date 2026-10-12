@@ -34,7 +34,7 @@ Positive = expected result, negative = rejected with the right status and nothin
 | Store (`StoreResourceTest`, `LegacyStoreManagerGatewayTest`) | CRUD works; legacy system is called only **after** the commit, with the saved store | Commit fails (duplicate name) → legacy system never called; id on create / missing name → 422; unknown id → 404; legacy failure is logged, not thrown |
 | Product (`ProductResourceTest`) | CRUD works | id on create / missing name → 422; unknown id → 404 |
 | Fulfilment (`FulfilmentServiceTest`, `FulfilmentResourceTest`) | Assign, list with filters, remove; a warehouse/product already used doesn't count again at the limit | 3rd warehouse per product per store, 4th warehouse per store, 6th product per warehouse → 400; duplicate → 409; unknown store, product or (archived) warehouse → 404; missing fields → 400 |
-| Error mappers (`*ErrorMapperTest`) | Status taken from `WebApplicationException` | Other exceptions → 500; no message → no `error` field |
+| Error mapper (`GlobalExceptionMapperTest`) | Status taken from `WebApplicationException` | Other exceptions → 500; no message → no `error` field |
 | Health (`HealthEndpointTest`, `LocationDataHealthCheckTest`) | Ready (database + location data) and live are UP | Location check is DOWN without locations |
 
 The integration tests (`WarehouseOperationsIT`, `StoreEndpointIT`, `ProductEndpointIT`, `FulfilmentEndpointIT`, `HealthEndpointIT`, `WarehouseEndpointIT`) repeat the main flows and a few rejections against the packaged app.
