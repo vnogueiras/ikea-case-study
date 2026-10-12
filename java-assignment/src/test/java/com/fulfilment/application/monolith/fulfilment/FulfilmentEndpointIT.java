@@ -96,6 +96,34 @@ public class FulfilmentEndpointIT {
     assign(storeId, products[3], "MWH.012");
   }
 
+  @Test
+  public void warehouseCanStoreMaxFiveProductTypes() {
+    long storeId = create("store", "{\"name\": \"STORE-IT-" + shortId() + "\"}");
+    String warehouse = createWarehouse("AMSTERDAM-001");
+    long[] products = new long[6];
+    for (int i = 0; i < products.length; i++) {
+      products[i] = create("product", "{\"name\": \"PRODUCT-IT-" + shortId() + "\"}");
+    }
+
+    for (int i = 0; i < 5; i++) {
+      assign(storeId, products[i], warehouse);
+    }
+
+    // a 6th product type is rejected
+    given()
+        .contentType(ContentType.JSON)
+        .body(json(storeId, products[5], warehouse))
+        .when()
+        .post(PATH)
+        .then()
+        .statusCode(400)
+        .body("error", containsString("maximum of 5 product types"));
+
+    // a product the warehouse already stores is fine for another store
+    long otherStoreId = create("store", "{\"name\": \"STORE-IT-" + shortId() + "\"}");
+    assign(otherStoreId, products[0], warehouse);
+  }
+
   // ---------- helpers ----------
 
   private long assign(long storeId, long productId, String warehouse) {

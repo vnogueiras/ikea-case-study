@@ -20,6 +20,9 @@ public class FulfilmentService {
   /** Constraint 2: each Store can be fulfilled by max 3 different Warehouses. */
   static final int MAX_WAREHOUSES_PER_STORE = 3;
 
+  /** Constraint 3: each Warehouse can store max 5 types of Products. */
+  static final int MAX_PRODUCTS_PER_WAREHOUSE = 5;
+
   @Inject FulfilmentAssignmentRepository assignmentRepository;
   @Inject StoreRepository storeRepository;
   @Inject ProductRepository productRepository;
@@ -27,56 +30,16 @@ public class FulfilmentService {
 
   @Transactional
   public FulfilmentAssignment assign(Long storeId, Long productId, String warehouseBuCode) {
-    if (storeId == null
-        || productId == null
-        || warehouseBuCode == null
-        || warehouseBuCode.isBlank()) {
-      throw new WebApplicationException(
-          "storeId, productId and warehouseBusinessUnitCode are required.", 400);
-    }
+    validateRequiredFields(storeId, productId, warehouseBuCode);
 
-    Store store = storeRepository.findById(storeId);
-    if (store == null) {
-      throw new WebApplicationException("Store with id " + storeId + " does not exist.", 404);
-    }
-    Product product = productRepository.findById(productId);
-    if (product == null) {
-      throw new WebApplicationException("Product with id " + productId + " does not exist.", 404);
-    }
-    if (warehouseStore.findByBusinessUnitCode(warehouseBuCode) == null) {
-      throw new WebApplicationException(
-          "Active warehouse with business unit code " + warehouseBuCode + " does not exist.", 404);
-    }
+    Store store = findStore(storeId);
+    Product product = findProduct(productId);
+    validateWarehouseIsActive(warehouseBuCode);
 
-    if (assignmentRepository.exists(storeId, productId, warehouseBuCode)) {
-      throw new WebApplicationException(
-          "Warehouse " + warehouseBuCode + " already fulfils this product for this store.", 409);
-    }
-
-    if (assignmentRepository.countWarehousesFor(storeId, productId)
-        >= MAX_WAREHOUSES_PER_PRODUCT_PER_STORE) {
-      throw new WebApplicationException(
-          "Product "
-              + productId
-              + " already has the maximum of "
-              + MAX_WAREHOUSES_PER_PRODUCT_PER_STORE
-              + " warehouses for store "
-              + storeId
-              + ".",
-          400);
-    }
-
-    // a warehouse that already serves this store (for another product) is not a new one
-    if (!assignmentRepository.storeUsesWarehouse(storeId, warehouseBuCode)
-        && assignmentRepository.countDistinctWarehousesFor(storeId) >= MAX_WAREHOUSES_PER_STORE) {
-      throw new WebApplicationException(
-          "Store "
-              + storeId
-              + " is already fulfilled by the maximum of "
-              + MAX_WAREHOUSES_PER_STORE
-              + " warehouses.",
-          400);
-    }
+    validateNotAlreadyAssigned(storeId, productId, warehouseBuCode);
+    validateWarehousesPerProductPerStore(storeId, productId);
+    validateWarehousesPerStore(storeId, warehouseBuCode);
+    validateProductsPerWarehouse(warehouseBuCode, productId);
 
     FulfilmentAssignment assignment = new FulfilmentAssignment();
     assignment.store = store;
@@ -90,6 +53,96 @@ public class FulfilmentService {
   public void remove(Long id) {
     if (!assignmentRepository.deleteById(id)) {
       throw new WebApplicationException("Fulfilment assignment " + id + " does not exist.", 404);
+    }
+  }
+
+  // ---------- input and lookups ----------
+
+  private void validateRequiredFields(Long storeId, Long productId, String warehouseBuCode) {
+    if (storeId == null
+        || productId == null
+        || warehouseBuCode == null
+        || warehouseBuCode.isBlank()) {
+      throw new WebApplicationException(
+          "storeId, productId and warehouseBusinessUnitCode are required.", 400);
+    }
+  }
+
+  private Store findStore(Long storeId) {
+    Store store = storeRepository.findById(storeId);
+    if (store == null) {
+      throw new WebApplicationException("Store with id " + storeId + " does not exist.", 404);
+    }
+    return store;
+  }
+
+  private Product findProduct(Long productId) {
+    Product product = productRepository.findById(productId);
+    if (product == null) {
+      throw new WebApplicationException("Product with id " + productId + " does not exist.", 404);
+    }
+    return product;
+  }
+
+  /** Only active warehouses can be assigned; archived ones are not found by business unit code. */
+  private void validateWarehouseIsActive(String warehouseBuCode) {
+    if (warehouseStore.findByBusinessUnitCode(warehouseBuCode) == null) {
+      throw new WebApplicationException(
+          "Active warehouse with business unit code " + warehouseBuCode + " does not exist.", 404);
+    }
+  }
+
+  // ---------- business rules ----------
+
+  private void validateNotAlreadyAssigned(Long storeId, Long productId, String warehouseBuCode) {
+    if (assignmentRepository.exists(storeId, productId, warehouseBuCode)) {
+      throw new WebApplicationException(
+          "Warehouse " + warehouseBuCode + " already fulfils this product for this store.", 409);
+    }
+  }
+
+  /** Constraint 1. */
+  private void validateWarehousesPerProductPerStore(Long storeId, Long productId) {
+    if (assignmentRepository.countWarehousesFor(storeId, productId)
+        >= MAX_WAREHOUSES_PER_PRODUCT_PER_STORE) {
+      throw new WebApplicationException(
+          "Product "
+              + productId
+              + " already has the maximum of "
+              + MAX_WAREHOUSES_PER_PRODUCT_PER_STORE
+              + " warehouses for store "
+              + storeId
+              + ".",
+          400);
+    }
+  }
+
+  /** Constraint 2. A warehouse the store already uses (for another product) is not a new one. */
+  private void validateWarehousesPerStore(Long storeId, String warehouseBuCode) {
+    if (!assignmentRepository.storeUsesWarehouse(storeId, warehouseBuCode)
+        && assignmentRepository.countDistinctWarehousesFor(storeId) >= MAX_WAREHOUSES_PER_STORE) {
+      throw new WebApplicationException(
+          "Store "
+              + storeId
+              + " is already fulfilled by the maximum of "
+              + MAX_WAREHOUSES_PER_STORE
+              + " warehouses.",
+          400);
+    }
+  }
+
+  /** Constraint 3. A product the warehouse already stores (for another store) is not a new type. */
+  private void validateProductsPerWarehouse(String warehouseBuCode, Long productId) {
+    if (!assignmentRepository.warehouseStoresProduct(warehouseBuCode, productId)
+        && assignmentRepository.countDistinctProductsFor(warehouseBuCode)
+            >= MAX_PRODUCTS_PER_WAREHOUSE) {
+      throw new WebApplicationException(
+          "Warehouse "
+              + warehouseBuCode
+              + " already stores the maximum of "
+              + MAX_PRODUCTS_PER_WAREHOUSE
+              + " product types.",
+          400);
     }
   }
 }

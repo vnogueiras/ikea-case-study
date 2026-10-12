@@ -148,6 +148,34 @@ public class FulfilmentServiceTest {
     verify(assignmentRepository).persist(any(FulfilmentAssignment.class));
   }
 
+  @Test
+  void shouldRejectSixthProductTypeForWarehouse() {
+    when(assignmentRepository.countDistinctProductsFor(WAREHOUSE)).thenReturn(5L);
+    when(assignmentRepository.warehouseStoresProduct(WAREHOUSE, PRODUCT_ID)).thenReturn(false);
+
+    assertRejected(400, () -> service.assign(STORE_ID, PRODUCT_ID, WAREHOUSE));
+  }
+
+  @Test
+  void shouldAllowProductTheWarehouseAlreadyStoresEvenAtTheLimit() {
+    // the warehouse has 5 product types, but already stores this one (for another store)
+    when(assignmentRepository.countDistinctProductsFor(WAREHOUSE)).thenReturn(5L);
+    when(assignmentRepository.warehouseStoresProduct(WAREHOUSE, PRODUCT_ID)).thenReturn(true);
+
+    service.assign(STORE_ID, PRODUCT_ID, WAREHOUSE);
+
+    verify(assignmentRepository).persist(any(FulfilmentAssignment.class));
+  }
+
+  @Test
+  void shouldAllowFifthProductTypeForWarehouse() {
+    when(assignmentRepository.countDistinctProductsFor(WAREHOUSE)).thenReturn(4L);
+
+    service.assign(STORE_ID, PRODUCT_ID, WAREHOUSE);
+
+    verify(assignmentRepository).persist(any(FulfilmentAssignment.class));
+  }
+
   // ---------- remove ----------
 
   @Test
