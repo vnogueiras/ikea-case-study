@@ -21,6 +21,24 @@ public class FulfilmentAssignmentRepository implements PanacheRepository<Fulfilm
         > 0;
   }
 
+  /** Number of different warehouses fulfilling any product for this store. */
+  public long countDistinctWarehousesFor(Long storeId) {
+    return getEntityManager()
+        .createQuery(
+            "select count(distinct a.warehouseBusinessUnitCode) from FulfilmentAssignment a"
+                + " where a.store.id = ?1",
+            Long.class)
+        .setParameter(1, storeId)
+        .getSingleResult();
+  }
+
+  /** Whether this warehouse already fulfils any product for this store. */
+  public boolean storeUsesWarehouse(Long storeId, String warehouseBusinessUnitCode) {
+    return count(
+            "store.id = ?1 and warehouseBusinessUnitCode = ?2", storeId, warehouseBusinessUnitCode)
+        > 0;
+  }
+
   /** All assignments, optionally filtered by store and/or product. */
   public List<FulfilmentAssignment> search(Long storeId, Long productId) {
     if (storeId != null && productId != null) {

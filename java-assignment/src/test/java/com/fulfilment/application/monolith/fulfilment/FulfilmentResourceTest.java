@@ -128,6 +128,31 @@ public class FulfilmentResourceTest {
     given().when().get(PATH).then().statusCode(200);
   }
 
+  @Test
+  public void storeCanBeFulfilledByMaxThreeDifferentWarehouses() {
+    long product2 = createProduct();
+    long product3 = createProduct();
+    long product4 = createProduct();
+    String fourthWarehouse = createWarehouse("AMSTERDAM-001");
+
+    assign(storeId, productId, "MWH.001");
+    assign(storeId, product2, "MWH.012");
+    assign(storeId, product3, "MWH.023");
+
+    // a 4th different warehouse for this store is rejected
+    given()
+        .contentType(ContentType.JSON)
+        .body(json(storeId, product4, fourthWarehouse))
+        .when()
+        .post(PATH)
+        .then()
+        .statusCode(400)
+        .body("error", containsString("maximum of 3 warehouses"));
+
+    // a warehouse the store already uses is fine for another product
+    assign(storeId, product4, "MWH.001");
+  }
+
   // ---------- helpers ----------
 
   private long assign(long store, long product, String warehouse) {
@@ -164,6 +189,23 @@ public class FulfilmentResourceTest {
         .extract()
         .jsonPath()
         .getLong("id");
+  }
+
+  private static String createWarehouse(String location) {
+    String buCode = "MWH.F" + UUID.randomUUID().toString().substring(0, 6);
+    given()
+        .contentType(ContentType.JSON)
+        .body(
+            "{\"businessUnitCode\": \""
+                + buCode
+                + "\", \"location\": \""
+                + location
+                + "\", \"capacity\": 5, \"stock\": 1}")
+        .when()
+        .post("warehouse")
+        .then()
+        .statusCode(200);
+    return buCode;
   }
 
   private static long createProduct() {

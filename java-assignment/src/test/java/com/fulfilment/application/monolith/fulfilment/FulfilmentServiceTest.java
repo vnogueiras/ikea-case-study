@@ -120,6 +120,34 @@ public class FulfilmentServiceTest {
     assertRejected(400, () -> service.assign(STORE_ID, PRODUCT_ID, " "));
   }
 
+  @Test
+  void shouldRejectFourthDifferentWarehouseForStore() {
+    when(assignmentRepository.countDistinctWarehousesFor(STORE_ID)).thenReturn(3L);
+    when(assignmentRepository.storeUsesWarehouse(STORE_ID, WAREHOUSE)).thenReturn(false);
+
+    assertRejected(400, () -> service.assign(STORE_ID, PRODUCT_ID, WAREHOUSE));
+  }
+
+  @Test
+  void shouldAllowWarehouseTheStoreAlreadyUsesEvenAtTheLimit() {
+    // the store has 3 warehouses, but this one is one of them (used for another product)
+    when(assignmentRepository.countDistinctWarehousesFor(STORE_ID)).thenReturn(3L);
+    when(assignmentRepository.storeUsesWarehouse(STORE_ID, WAREHOUSE)).thenReturn(true);
+
+    service.assign(STORE_ID, PRODUCT_ID, WAREHOUSE);
+
+    verify(assignmentRepository).persist(any(FulfilmentAssignment.class));
+  }
+
+  @Test
+  void shouldAllowThirdDifferentWarehouseForStore() {
+    when(assignmentRepository.countDistinctWarehousesFor(STORE_ID)).thenReturn(2L);
+
+    service.assign(STORE_ID, PRODUCT_ID, WAREHOUSE);
+
+    verify(assignmentRepository).persist(any(FulfilmentAssignment.class));
+  }
+
   // ---------- remove ----------
 
   @Test

@@ -17,6 +17,9 @@ public class FulfilmentService {
   /** Constraint 1: each Product can be fulfilled by max 2 different Warehouses per Store. */
   static final int MAX_WAREHOUSES_PER_PRODUCT_PER_STORE = 2;
 
+  /** Constraint 2: each Store can be fulfilled by max 3 different Warehouses. */
+  static final int MAX_WAREHOUSES_PER_STORE = 3;
+
   @Inject FulfilmentAssignmentRepository assignmentRepository;
   @Inject StoreRepository storeRepository;
   @Inject ProductRepository productRepository;
@@ -60,6 +63,18 @@ public class FulfilmentService {
               + " warehouses for store "
               + storeId
               + ".",
+          400);
+    }
+
+    // a warehouse that already serves this store (for another product) is not a new one
+    if (!assignmentRepository.storeUsesWarehouse(storeId, warehouseBuCode)
+        && assignmentRepository.countDistinctWarehousesFor(storeId) >= MAX_WAREHOUSES_PER_STORE) {
+      throw new WebApplicationException(
+          "Store "
+              + storeId
+              + " is already fulfilled by the maximum of "
+              + MAX_WAREHOUSES_PER_STORE
+              + " warehouses.",
           400);
     }
 
